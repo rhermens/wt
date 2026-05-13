@@ -1,9 +1,9 @@
 use std::process::Command;
 
 use clap::Parser;
+use git_worktree_utils::{git::WorktreeCheckoutAction, settings};
 use log::{error, info};
 use symlink_rs::symlink_auto;
-use wtutils::{git::WorktreeCheckoutAction, settings};
 
 #[derive(Parser, Debug)]
 struct Args {

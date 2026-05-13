@@ -20,11 +20,11 @@ pub fn init_log() {
 
 pub fn load_settings(cwd: &PathBuf) -> Result<Settings, ConfigError> {
     let mut config = Config::builder()
-        .add_source(File::with_name(&cwd.join(".wtutils").display().to_string()).required(false));
+        .add_source(File::with_name(&cwd.join(".worktree").display().to_string()).required(false));
 
-    if let Some(dirs) = ProjectDirs::from("", "", "wtutils") {
+    if let Some(dirs) = ProjectDirs::from("", "", "worktree-utils") {
         config = config.add_source(
-            File::with_name(&dirs.config_dir().join("wtutils").display().to_string())
+            File::with_name(&dirs.config_dir().join("config").display().to_string())
                 .required(false),
         );
     };
@@ -34,7 +34,7 @@ pub fn load_settings(cwd: &PathBuf) -> Result<Settings, ConfigError> {
         config = config.add_source(
             File::with_name(
                 &PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                    .join("examples/wtutils")
+                    .join("examples/config")
                     .display()
                     .to_string(),
             )

@@ -1,4 +1,4 @@
-### wtutils
+### git-worktree-utils
 IO utility hooks for git worktree workflows
 - Linking
 - Copying
@@ -10,5 +10,5 @@ IO utility hooks for git worktree workflows
 ## Usage
 Configuration can be done via 
 
-- $XDG_CONFIG_HOME/wtutils/wtutils.yaml
-- $GIT_DIR/.wtutils.yaml
+- $XDG_CONFIG_HOME/worktree-utils/config.yaml
+- $GIT_DIR/.worktree.yaml

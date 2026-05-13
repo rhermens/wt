@@ -383,6 +383,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "git-worktree-utils"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "config",
+ "directories",
+ "env_logger",
+ "git2",
+ "log",
+ "serde",
+ "symlink-rs",
+ "thiserror",
+]
+
+[[package]]
 name = "git2"
 version = "0.20.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1192,21 +1207,6 @@ name = "writeable"
 version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1ffae5123b2d3fc086436f8834ae3ab053a283cfac8fe0a0b8eaae044768a4c4"
-
-[[package]]
-name = "wtutils"
-version = "0.1.0"
-dependencies = [
- "clap",
- "config",
- "directories",
- "env_logger",
- "git2",
- "log",
- "serde",
- "symlink-rs",
- "thiserror",
-]
 
 [[package]]
 name = "yaml-rust2"
