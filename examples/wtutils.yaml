@@ -1,0 +1,4 @@
+copy:
+  - .env
+link:
+  - node_modules
