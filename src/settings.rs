@@ -11,15 +11,18 @@ pub struct Settings {
     pub link: Vec<String>,
 }
 
-pub fn load_settings() -> Result<Settings, ConfigError> {
+pub fn init_log() {
     env_logger::Builder::from_default_env()
         .filter(None, log::LevelFilter::Info)
         .init();
+}
 
+pub fn load_settings(cwd: &PathBuf) -> Result<Settings, ConfigError> {
     let defaults = Settings::default();
     let mut config = Config::builder()
         .set_default("copy", defaults.copy)
-        .unwrap();
+        .unwrap()
+        .add_source(File::with_name(&cwd.join(".wtutils").display().to_string()).required(false));
 
     if let Some(dirs) = ProjectDirs::from("", "", "wtutils") {
         config = config.add_source(

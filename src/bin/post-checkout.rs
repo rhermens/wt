@@ -1,7 +1,7 @@
 use clap::Parser;
 use log::{error, info};
 use symlink_rs::symlink_auto;
-use wtutils::{git::WorktreeCheckoutAction, settings::load_settings};
+use wtutils::{git::WorktreeCheckoutAction, settings};
 
 #[derive(Parser, Debug)]
 struct Args {
@@ -11,18 +11,19 @@ struct Args {
 }
 
 fn main() {
-    let settings = match load_settings() {
-        Ok(s) => s,
-        Err(e) => {
-            error!("Failed to load settings: {}", e);
-            return;
-        }
-    };
-
+    settings::init_log();
     let worktree = match WorktreeCheckoutAction::try_from_checkout() {
         Ok(w) => w,
         Err(e) => {
             error!("Failed to open repository: {}", e);
+            return;
+        }
+    };
+
+    let settings = match settings::load_settings(&worktree.common_wd) {
+        Ok(s) => s,
+        Err(e) => {
+            error!("Failed to load settings: {}", e);
             return;
         }
     };
