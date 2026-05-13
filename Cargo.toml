@@ -12,3 +12,4 @@ git2 = "0.20.4"
 log = "0.4.29"
 serde = { version = "1.0.228", features = ["derive"] }
 symlink-rs = "1.0.0"
+thiserror = "2.0.18"
