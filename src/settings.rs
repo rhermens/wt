@@ -7,8 +7,9 @@ use serde::Deserialize;
 
 #[derive(Debug, Deserialize, Default)]
 pub struct Settings {
-    pub copy: Vec<String>,
-    pub link: Vec<String>,
+    pub copy: Option<Vec<String>>,
+    pub link: Option<Vec<String>>,
+    pub commands: Option<Vec<String>>,
 }
 
 pub fn init_log() {
@@ -18,10 +19,7 @@ pub fn init_log() {
 }
 
 pub fn load_settings(cwd: &PathBuf) -> Result<Settings, ConfigError> {
-    let defaults = Settings::default();
     let mut config = Config::builder()
-        .set_default("copy", defaults.copy)
-        .unwrap()
         .add_source(File::with_name(&cwd.join(".wtutils").display().to_string()).required(false));
 
     if let Some(dirs) = ProjectDirs::from("", "", "wtutils") {
