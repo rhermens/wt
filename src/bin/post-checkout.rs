@@ -1,5 +1,4 @@
 use clap::Parser;
-use git2::Repository;
 use log::{error, info};
 use symlink_rs::symlink_auto;
 use wtutils::{git::WorktreeCheckoutAction, settings::load_settings};
