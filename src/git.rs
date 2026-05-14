@@ -1,6 +1,7 @@
-use std::{path::PathBuf, process::Command};
+use std::{fs, path::PathBuf, process::Command};
 
-use git2::{ErrorCode, Repository};
+use clap::Error;
+use git2::{ErrorCode, Repository, WorktreeAddOptions};
 use log::{error, info};
 use thiserror::Error;
 use tmux_interface::{NewSession, NewWindow, Tmux, TmuxCommands};
@@ -61,12 +62,17 @@ impl WorktreeContext {
                 .display()
                 .to_string(),
             &path,
-            None,
+            Some(
+                &WorktreeAddOptions::new()
+                    .checkout_existing(!fs::exists(path).expect("Failed to stat path")),
+            ),
         ) {
             Ok(wt) => wt.path().to_path_buf(),
             Err(e) => match e.code() {
                 ErrorCode::Exists => path.clone(),
-                _ => return Err(WorktreeError::GitError { source: e }),
+                _ => {
+                    return Err(WorktreeError::GitError { source: e });
+                }
             },
         };
 
@@ -109,7 +115,10 @@ impl WorktreeContext {
                     .args(&["-c", &cmd])
                     .current_dir(&self.worktree_path)
                     .spawn()
-                    .expect("Failed to spawn process")
+                    .expect(&format!(
+                        "Failed to spawn process in {}",
+                        &self.worktree_path.display().to_string()
+                    ))
             })
             .collect::<Vec<_>>();
 

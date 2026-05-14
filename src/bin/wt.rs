@@ -16,7 +16,8 @@ fn main() {
     let worktree = match WorktreeContext::try_create_or_open(&args.path) {
         Ok(wt) => wt,
         Err(e) => {
-            return error!("Failed to create worktree: {}", e);
+            error!("Failed to create worktree: {}", e);
+            return;
         }
     };
 
