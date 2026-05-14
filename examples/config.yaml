@@ -1,7 +1,7 @@
-# copy:
-#   - .env
-# link:
-#   - node_modules
+copy:
+  - .env
+link:
+  - node_modules
 commands:
   - echo $GIT_DIR
   - ls -lah
