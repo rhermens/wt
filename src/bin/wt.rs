@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 
 use clap::Parser;
-use git_worktree_utils::{git::WorktreeContext, settings};
 use log::error;
+use wt::{git::WorktreeContext, settings};
 
 #[derive(Parser, Debug)]
 struct Args {

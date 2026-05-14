@@ -32,9 +32,9 @@ pub fn load_settings(cwd: &PathBuf) -> Result<Settings, ConfigError> {
         .set_default("commands", Vec::<String>::new())?
         .set_default("tmux.create_session", false)?
         .set_default("tmux.additional_windows", Vec::<String>::new())?
-        .add_source(File::with_name(&cwd.join(".worktree").display().to_string()).required(false));
+        .add_source(File::with_name(&cwd.join(".wt").display().to_string()).required(false));
 
-    if let Some(dirs) = ProjectDirs::from("", "", "worktree-utils")
+    if let Some(dirs) = ProjectDirs::from("", "", "wt")
         && !cfg!(debug_assertions)
     {
         config = config.add_source(

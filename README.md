@@ -1,10 +1,10 @@
-# git-worktree-utils
+# wt
 
 A CLI tool that automates common setup tasks when creating or switching to a Git worktree. It can automatically copy files, create symlinks, run shell commands, and spawn a tmux session — keeping each worktree environment ready to use.
 
 ## How it works
 
-The `create-worktree` binary creates a new Git worktree at a given path (or opens it if it already exists), then applies the configured actions relative to the main repository root.
+The `wt` binary creates a new Git worktree at a given path (or opens it if it already exists), then applies the configured actions relative to the main repository root.
 
 **Actions:**
 
@@ -16,7 +16,7 @@ The `create-worktree` binary creates a new Git worktree at a given path (or open
 ## Usage
 
 ```sh
-create-worktree <path>
+wt <path>
 ```
 
 Creates (or opens) a worktree at `<path>`, then runs the configured copy, link, command, and tmux actions.
@@ -35,8 +35,8 @@ Settings are loaded from the following locations (in order, last wins):
 
 | Location | Description |
 |---|---|
-| `$XDG_CONFIG_HOME/worktree-utils/config.yaml` | User-level defaults applied to all repositories |
-| `$GIT_DIR/.worktree.yaml` | Per-repository configuration |
+| `$XDG_CONFIG_HOME/wt/config.yaml` | User-level defaults applied to all repositories |
+| `$GIT_DIR/.wt.yaml` | Per-repository configuration |
 
 ### Config format
 
