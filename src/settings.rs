@@ -7,9 +7,16 @@ use serde::Deserialize;
 
 #[derive(Debug, Deserialize, Default)]
 pub struct Settings {
-    pub copy: Option<Vec<String>>,
-    pub link: Option<Vec<String>>,
-    pub commands: Option<Vec<String>>,
+    pub copy: Vec<String>,
+    pub link: Vec<String>,
+    pub commands: Vec<String>,
+    pub tmux: TmuxOptions,
+}
+
+#[derive(Debug, Deserialize, Default)]
+pub struct TmuxOptions {
+    pub create_session: bool,
+    pub additional_windows: Vec<String>,
 }
 
 pub fn init_log() {
@@ -20,9 +27,16 @@ pub fn init_log() {
 
 pub fn load_settings(cwd: &PathBuf) -> Result<Settings, ConfigError> {
     let mut config = Config::builder()
+        .set_default("copy", Vec::<String>::new())?
+        .set_default("link", Vec::<String>::new())?
+        .set_default("commands", Vec::<String>::new())?
+        .set_default("tmux.create_session", false)?
+        .set_default("tmux.additional_windows", Vec::<String>::new())?
         .add_source(File::with_name(&cwd.join(".worktree").display().to_string()).required(false));
 
-    if let Some(dirs) = ProjectDirs::from("", "", "worktree-utils") {
+    if let Some(dirs) = ProjectDirs::from("", "", "worktree-utils")
+        && !cfg!(debug_assertions)
+    {
         config = config.add_source(
             File::with_name(&dirs.config_dir().join("config").display().to_string())
                 .required(false),

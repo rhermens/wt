@@ -13,3 +13,4 @@ log = "0.4.29"
 serde = { version = "1.0.228", features = ["derive"] }
 symlink-rs = "1.0.0"
 thiserror = "2.0.18"
+tmux_interface = "0.4.0"
