@@ -16,7 +16,7 @@ The `wt` binary creates a new Git worktree at a given path (or opens it if it al
 ## Usage
 
 ```sh
-wt <path>
+wt <path> -- <additional_args>
 ```
 
 Creates (or opens) a worktree at `<path>`, then runs the configured copy, link, command, and tmux actions.
@@ -26,7 +26,7 @@ Creates (or opens) a worktree at `<path>`, then runs the configured copy, link, 
 Build and install the binary:
 
 ```sh
-cargo install --path . -- <additional_args>
+cargo install --path .
 ```
 
 ## Configuration
