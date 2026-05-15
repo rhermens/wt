@@ -26,7 +26,7 @@ Creates (or opens) a worktree at `<path>`, then runs the configured copy, link, 
 Build and install the binary:
 
 ```sh
-cargo install --path .
+cargo install --path . -- <additional_args>
 ```
 
 ## Configuration
@@ -60,7 +60,7 @@ tmux:
     - ""        # blank shell window
     - "nvim"    # open neovim
     - ""
-    - "opencode"
+    - "opencode --prompt=$1" # Each positional argument is replaced with <additional_args>
 ```
 
 See [`examples/config.yaml`](examples/config.yaml) for a reference configuration.
