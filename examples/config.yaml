@@ -11,5 +11,5 @@ tmux:
     - ""
     - "nvim"
     - ""
-    - "opencode"
+    - "opencode --prompt=$1"
 

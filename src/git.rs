@@ -1,10 +1,11 @@
 use std::{fs, path::PathBuf, process::Command};
 
-use clap::Error;
 use git2::{ErrorCode, Repository, WorktreeAddOptions};
 use log::{error, info};
 use thiserror::Error;
 use tmux_interface::{NewSession, NewWindow, Tmux, TmuxCommands};
+
+use crate::shell;
 
 #[derive(Debug)]
 pub struct WorktreeContext {
@@ -86,7 +87,7 @@ impl WorktreeContext {
         })
     }
 
-    pub fn copy_sources(&self, sources: &Vec<String>) {
+    pub fn copy_sources(&self, sources: &[String]) {
         for file in sources {
             match std::fs::copy(self.main_path.join(&file), self.worktree_path.join(&file)) {
                 Err(e) => error!("Error copying {}: {}", &file, e),
@@ -95,7 +96,7 @@ impl WorktreeContext {
         }
     }
 
-    pub fn link_sources(&self, sources: &Vec<String>) {
+    pub fn link_sources(&self, sources: &[String]) {
         for file in sources {
             match symlink_rs::symlink_auto(
                 self.main_path.join(&file),
@@ -107,12 +108,12 @@ impl WorktreeContext {
         }
     }
 
-    pub fn spawn_commands(&self, commands: &Vec<String>) {
+    pub fn spawn_commands(&self, commands: &[String], command_args: &[String]) {
         let procs = commands
             .into_iter()
             .map(|cmd| {
                 Command::new("sh")
-                    .args(&["-c", &cmd])
+                    .args(&["-c", &shell::substitute_args(&cmd, command_args)])
                     .current_dir(&self.worktree_path)
                     .spawn()
                     .expect(&format!(
@@ -127,7 +128,7 @@ impl WorktreeContext {
         }
     }
 
-    pub fn spawn_tmux_session(&self, windows: &Vec<String>) {
+    pub fn spawn_tmux_session(&self, windows: &[String], command_args: &[String]) {
         let session_name = format!(
             "{} ({})",
             self.worktree_path
@@ -153,7 +154,10 @@ impl WorktreeContext {
             let c = NewWindow::new()
                 .target_window(&session_name)
                 .start_directory(self.worktree_path.display().to_string())
-                .shell_command(format!("{}; exec $SHELL", command));
+                .shell_command(format!(
+                    "{}; exec $SHELL",
+                    &shell::substitute_args(command, command_args)
+                ));
             commands.push(c);
         }
 
