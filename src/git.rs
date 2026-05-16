@@ -2,61 +2,39 @@ use std::{fs, path::PathBuf, process::Command};
 
 use git2::{ErrorCode, Repository, WorktreeAddOptions};
 use log::{error, info};
-use thiserror::Error;
 use tmux_interface::{NewSession, NewWindow, Tmux, TmuxCommands};
 
-use crate::shell;
+use crate::{error::Error, settings::Settings};
 
 #[derive(Debug)]
 pub struct WorktreeContext {
-    pub main_path: PathBuf,
-    pub worktree_path: PathBuf,
-}
-
-#[derive(Debug, Error)]
-pub enum WorktreeError {
-    #[error("Invalid git state: {source}")]
-    GitError {
-        #[source]
-        source: git2::Error,
-    },
-
-    #[error("Not a worktree")]
-    NotAWorktree,
-
-    #[error("Failed to open checkout: {source}")]
-    FailedToOpenRepository {
-        #[source]
-        source: git2::Error,
-    },
-
-    #[error("Failed to read working directories")]
-    InvalidWorkingDirectories,
+    main_path: PathBuf,
+    worktree_path: PathBuf,
+    settings: Settings,
 }
 
 impl WorktreeContext {
-    pub fn try_from_hook() -> Result<Self, WorktreeError> {
-        let repo = Repository::open_from_env()
-            .map_err(|e| WorktreeError::FailedToOpenRepository { source: e })?;
+    pub fn try_new(path: &PathBuf, substitutions: &[String]) -> Result<Self, Error> {
+        let repo = Repository::discover(std::env::current_dir().expect("Failed to get CWD"))
+            .map_err(|e| Error::GitError { source: e })?;
 
-        if !repo.is_worktree() {
-            return Err(WorktreeError::NotAWorktree);
-        }
+        let main_path = repo
+            .path()
+            .parent()
+            .expect("Invalid repo path")
+            .to_path_buf();
+        let worktree_path = Self::open_worktree(&repo, path)?;
+        let settings = Settings::new(&main_path)?.substitute(substitutions)?;
 
-        match (repo.commondir().parent(), repo.workdir()) {
-            (Some(commondir_wd), Some(worktree_wd)) => Ok(Self {
-                main_path: commondir_wd.to_path_buf(),
-                worktree_path: worktree_wd.to_path_buf(),
-            }),
-            (_, _) => return Err(WorktreeError::InvalidWorkingDirectories),
-        }
+        Ok(Self {
+            main_path,
+            worktree_path,
+            settings,
+        })
     }
 
-    pub fn try_create_or_open(path: &PathBuf) -> Result<Self, WorktreeError> {
-        let repo = Repository::discover(std::env::current_dir().expect("Failed to get CWD"))
-            .map_err(|e| WorktreeError::GitError { source: e })?;
-
-        let wt_path = match repo.worktree(
+    fn open_worktree(repo: &Repository, path: &PathBuf) -> Result<PathBuf, Error> {
+        match repo.worktree(
             &path
                 .file_name()
                 .expect("Invalid path")
@@ -68,27 +46,18 @@ impl WorktreeContext {
                     .checkout_existing(!fs::exists(path).expect("Failed to stat path")),
             ),
         ) {
-            Ok(wt) => wt.path().to_path_buf(),
+            Ok(wt) => Ok(wt.path().to_path_buf()),
             Err(e) => match e.code() {
-                ErrorCode::Exists => path.clone(),
+                ErrorCode::Exists => Ok(path.clone()),
                 _ => {
-                    return Err(WorktreeError::GitError { source: e });
+                    return Err(Error::GitError { source: e });
                 }
             },
-        };
-
-        Ok(Self {
-            main_path: repo
-                .path()
-                .parent()
-                .expect("Invalid repo path")
-                .to_path_buf(),
-            worktree_path: wt_path,
-        })
+        }
     }
 
-    pub fn copy_sources(&self, sources: &[String]) {
-        for file in sources {
+    pub fn copy_sources(&self) {
+        for file in &self.settings.copy {
             match std::fs::copy(self.main_path.join(&file), self.worktree_path.join(&file)) {
                 Err(e) => error!("Error copying {}: {}", &file, e),
                 Ok(_) => info!("Copied {}", &file),
@@ -96,8 +65,8 @@ impl WorktreeContext {
         }
     }
 
-    pub fn link_sources(&self, sources: &[String]) {
-        for file in sources {
+    pub fn link_sources(&self) {
+        for file in &self.settings.link {
             match symlink_rs::symlink_auto(
                 self.main_path.join(&file),
                 self.worktree_path.join(&file),
@@ -108,12 +77,14 @@ impl WorktreeContext {
         }
     }
 
-    pub fn spawn_commands(&self, commands: &[String], command_args: &[String]) {
-        let procs = commands
-            .into_iter()
+    pub fn spawn_commands(&self) {
+        let procs = self
+            .settings
+            .commands
+            .iter()
             .map(|cmd| {
                 Command::new("sh")
-                    .args(&["-c", &shell::substitute_args(&cmd, command_args)])
+                    .args(&["-c", &cmd])
                     .current_dir(&self.worktree_path)
                     .spawn()
                     .expect(&format!(
@@ -128,7 +99,11 @@ impl WorktreeContext {
         }
     }
 
-    pub fn spawn_tmux_session(&self, windows: &[String], command_args: &[String]) {
+    pub fn spawn_tmux_session(&self) {
+        if !self.settings.tmux.create_session {
+            return;
+        }
+
         let session_name = format!(
             "{} ({})",
             self.worktree_path
@@ -150,14 +125,11 @@ impl WorktreeContext {
                 .detached()
                 .start_directory(self.worktree_path.display().to_string()),
         );
-        for command in windows {
+        for command in &self.settings.tmux.additional_windows {
             let c = NewWindow::new()
                 .target_window(&session_name)
                 .start_directory(self.worktree_path.display().to_string())
-                .shell_command(format!(
-                    "{}; exec $SHELL",
-                    &shell::substitute_args(command, command_args)
-                ));
+                .shell_command(format!("{}; exec $SHELL", &command));
             commands.push(c);
         }
 

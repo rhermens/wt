@@ -1,3 +1,3 @@
+pub mod error;
 pub mod git;
 pub mod settings;
-mod shell;

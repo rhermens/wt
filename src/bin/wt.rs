@@ -10,34 +10,23 @@ struct Args {
     pub path: PathBuf,
 
     #[arg(index = 2, num_args = 1..)]
-    pub command_args: Vec<String>,
+    pub command_substitutions: Vec<String>,
 }
 
 fn main() {
     settings::init_log();
     let args = Args::parse();
 
-    let worktree = match WorktreeContext::try_create_or_open(&args.path) {
+    let worktree = match WorktreeContext::try_new(&args.path, &args.command_substitutions) {
         Ok(wt) => wt,
         Err(e) => {
-            error!("Failed to create worktree: {}", e);
+            error!("Failed to open worktree: {}", e);
             return;
         }
     };
 
-    let settings = match settings::load_settings(&worktree.main_path) {
-        Ok(s) => s,
-        Err(e) => {
-            error!("Failed to load settings: {}", e);
-            return;
-        }
-    };
-
-    worktree.copy_sources(&settings.copy);
-    worktree.link_sources(&settings.link);
-    worktree.spawn_commands(&settings.commands, &args.command_args);
-
-    if settings.tmux.create_session {
-        worktree.spawn_tmux_session(&settings.tmux.additional_windows, &args.command_args);
-    }
+    worktree.copy_sources();
+    worktree.link_sources();
+    worktree.spawn_commands();
+    worktree.spawn_tmux_session();
 }
