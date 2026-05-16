@@ -16,7 +16,7 @@ The `wt` binary creates a new Git worktree at a given path (or opens it if it al
 ## Usage
 
 ```sh
-wt <path> -- <additional_args>
+wt <path> -- <command_substitions>
 ```
 
 Creates (or opens) a worktree at `<path>`, then runs the configured copy, link, command, and tmux actions.
@@ -60,7 +60,7 @@ tmux:
     - ""        # blank shell window
     - "nvim"    # open neovim
     - ""
-    - "opencode --prompt=$1" # Each positional argument is replaced with <additional_args>
+    - "opencode --prompt=$1" # Each placeholder is replaced with <command_substitions>
 ```
 
 See [`examples/config.yaml`](examples/config.yaml) for a reference configuration.
