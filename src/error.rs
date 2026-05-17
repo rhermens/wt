@@ -26,6 +26,26 @@ pub enum Error {
         source: std::io::Error,
     },
 
+    #[error("Copy error for '{path}': {source}")]
+    CopyError {
+        path: PathBuf,
+        #[source]
+        source: std::io::Error,
+    },
+
+    #[error("Linking error for '{path}': {source}")]
+    LinkError {
+        path: PathBuf,
+        #[source]
+        source: std::io::Error,
+    },
+
+    #[error("Error spawning command: {source}")]
+    CommandError {
+        #[source]
+        source: std::io::Error,
+    },
+
     #[error("Invalid path: '{0}' has no usable file name")]
     InvalidPath(PathBuf),
 

@@ -60,7 +60,10 @@ impl WorktreeContext {
         ) {
             Ok(wt) => Ok(wt.path().to_path_buf()),
             Err(e) => match e.code() {
-                ErrorCode::Exists => Ok(path.to_path_buf()),
+                ErrorCode::Exists => {
+                    warn!("Worktree exists: {}", e);
+                    Ok(path.to_path_buf())
+                }
                 _ => Err(Error::GitError { source: e }),
             },
         }
@@ -78,7 +81,7 @@ impl WorktreeContext {
                         info!("Copied {}", file);
                         None
                     }
-                    Err(e) => Some(Error::IoError {
+                    Err(e) => Some(Error::CopyError {
                         path: src,
                         source: e,
                     }),
@@ -99,7 +102,7 @@ impl WorktreeContext {
                         info!("Linked {}", file);
                         None
                     }
-                    Err(e) => Some(Error::IoError {
+                    Err(e) => Some(Error::LinkError {
                         path: src,
                         source: e,
                     }),
@@ -117,18 +120,12 @@ impl WorktreeContext {
                     .args(["-c", cmd])
                     .current_dir(&self.worktree_path)
                     .spawn()
-                    .map_err(|e| Error::IoError {
-                        path: self.worktree_path.clone(),
-                        source: e,
-                    });
+                    .map_err(|e| Error::CommandError { source: e });
 
                 match spawn_result {
                     Err(e) => Some(e),
                     Ok(mut child) => match child.wait() {
-                        Err(e) => Some(Error::IoError {
-                            path: self.worktree_path.clone(),
-                            source: e,
-                        }),
+                        Err(e) => Some(Error::CommandError { source: e }),
                         Ok(status) if !status.success() => {
                             warn!("Command exited with {}: {}", status, cmd);
                             None
