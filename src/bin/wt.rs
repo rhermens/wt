@@ -25,10 +25,15 @@ fn main() -> ExitCode {
         }
     };
 
-    worktree.copy_sources();
-    worktree.link_sources();
-    worktree.spawn_commands();
-    worktree.spawn_tmux_session();
+    for e in worktree
+        .copy_sources()
+        .into_iter()
+        .chain(worktree.link_sources())
+        .chain(worktree.spawn_commands())
+        .chain(worktree.spawn_tmux_session())
+    {
+        error!("{}", e);
+    }
 
     ExitCode::SUCCESS
 }

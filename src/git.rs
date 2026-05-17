@@ -5,7 +5,7 @@ use std::{
 };
 
 use git2::{ErrorCode, Repository, WorktreeAddOptions};
-use log::{error, info};
+use log::{info, warn};
 use tmux_interface::{NewSession, NewWindow, Tmux, TmuxCommands};
 
 use crate::{error::Error, settings::Settings};
@@ -19,14 +19,19 @@ pub struct WorktreeContext {
 
 impl WorktreeContext {
     pub fn try_new(path: &Path, substitutions: &[String]) -> Result<Self, Error> {
-        let repo = Repository::discover(std::env::current_dir().expect("Failed to get CWD"))
-            .map_err(|e| Error::GitError { source: e })?;
+        let cwd = std::env::current_dir().map_err(|e| Error::IoError {
+            path: PathBuf::from("."),
+            source: e,
+        })?;
+
+        let repo = Repository::discover(cwd).map_err(|e| Error::GitError { source: e })?;
 
         let main_path = repo
             .path()
             .parent()
-            .expect("Invalid repo path")
+            .ok_or_else(|| Error::InvalidPath(repo.path().to_path_buf()))?
             .to_path_buf();
+
         let worktree_path = Self::open_worktree(&repo, path)?;
         let settings = Settings::new(&main_path)?.substitute(substitutions)?;
 
@@ -38,111 +43,148 @@ impl WorktreeContext {
     }
 
     fn open_worktree(repo: &Repository, path: &Path) -> Result<PathBuf, Error> {
+        let name = path
+            .file_name()
+            .ok_or_else(|| Error::InvalidPath(path.to_path_buf()))?
+            .to_string_lossy()
+            .into_owned();
+
+        let already_exists = fs::exists(path).map_err(|e| Error::IoError {
+            path: path.to_path_buf(),
+            source: e,
+        })?;
+
         match repo.worktree(
-            &path
-                .file_name()
-                .expect("Invalid path")
-                .display()
-                .to_string(),
-            &path,
-            Some(
-                &WorktreeAddOptions::new()
-                    .checkout_existing(!fs::exists(path).expect("Failed to stat path")),
-            ),
+            &name,
+            path,
+            Some(WorktreeAddOptions::new().checkout_existing(!already_exists)),
         ) {
             Ok(wt) => Ok(wt.path().to_path_buf()),
             Err(e) => match e.code() {
                 ErrorCode::Exists => Ok(path.to_path_buf()),
-                _ => {
-                    return Err(Error::GitError { source: e });
-                }
+                _ => Err(Error::GitError { source: e }),
             },
         }
     }
 
-    pub fn copy_sources(&self) {
-        for file in &self.settings.copy {
-            match std::fs::copy(self.main_path.join(&file), self.worktree_path.join(&file)) {
-                Err(e) => error!("Error copying {}: {}", &file, e),
-                Ok(_) => info!("Copied {}", &file),
-            }
-        }
+    pub fn copy_sources(&self) -> Vec<Error> {
+        self.settings
+            .copy
+            .iter()
+            .filter_map(|file| {
+                let src = self.main_path.join(file);
+                let dst = self.worktree_path.join(file);
+                match std::fs::copy(&src, &dst) {
+                    Ok(_) => {
+                        info!("Copied {}", file);
+                        None
+                    }
+                    Err(e) => Some(Error::IoError {
+                        path: src,
+                        source: e,
+                    }),
+                }
+            })
+            .collect()
     }
 
-    pub fn link_sources(&self) {
-        for file in &self.settings.link {
-            match symlink_rs::symlink_auto(
-                self.main_path.join(&file),
-                self.worktree_path.join(&file),
-            ) {
-                Err(e) => error!("Error linking {}: {}", &file, e),
-                Ok(_) => info!("Linked {}", &file),
-            }
-        }
+    pub fn link_sources(&self) -> Vec<Error> {
+        self.settings
+            .link
+            .iter()
+            .filter_map(|file| {
+                let src = self.main_path.join(file);
+                let dst = self.worktree_path.join(file);
+                match symlink_rs::symlink_auto(&src, &dst) {
+                    Ok(_) => {
+                        info!("Linked {}", file);
+                        None
+                    }
+                    Err(e) => Some(Error::IoError {
+                        path: src,
+                        source: e,
+                    }),
+                }
+            })
+            .collect()
     }
 
-    pub fn spawn_commands(&self) {
-        let procs = self
-            .settings
+    pub fn spawn_commands(&self) -> Vec<Error> {
+        self.settings
             .commands
             .iter()
-            .map(|cmd| {
-                Command::new("sh")
-                    .args(&["-c", &cmd])
+            .filter_map(|cmd| {
+                let spawn_result = Command::new("sh")
+                    .args(["-c", cmd])
                     .current_dir(&self.worktree_path)
                     .spawn()
-                    .expect(&format!(
-                        "Failed to spawn process in {}",
-                        &self.worktree_path.display().to_string()
-                    ))
-            })
-            .collect::<Vec<_>>();
+                    .map_err(|e| Error::IoError {
+                        path: self.worktree_path.clone(),
+                        source: e,
+                    });
 
-        for mut proc in procs {
-            proc.wait().expect("Failed to wait for status");
-        }
+                match spawn_result {
+                    Err(e) => Some(e),
+                    Ok(mut child) => match child.wait() {
+                        Err(e) => Some(Error::IoError {
+                            path: self.worktree_path.clone(),
+                            source: e,
+                        }),
+                        Ok(status) if !status.success() => {
+                            warn!("Command exited with {}: {}", status, cmd);
+                            None
+                        }
+                        Ok(_) => None,
+                    },
+                }
+            })
+            .collect()
     }
 
-    pub fn spawn_tmux_session(&self) {
+    pub fn spawn_tmux_session(&self) -> Vec<Error> {
         if !self.settings.tmux.create_session {
-            return;
+            return vec![];
         }
 
-        let session_name = format!(
-            "{} ({})",
-            self.worktree_path
-                .file_name()
-                .expect("Failed to read worktree basename")
-                .display()
-                .to_string(),
-            self.main_path
-                .file_name()
-                .expect("Failed to read main basename")
-                .display()
-                .to_string()
-        );
+        let worktree_name = match self.worktree_path.file_name() {
+            Some(n) => n.to_string_lossy().into_owned(),
+            None => return vec![Error::InvalidPath(self.worktree_path.clone())],
+        };
+
+        let main_name = match self.main_path.file_name() {
+            Some(n) => n.to_string_lossy().into_owned(),
+            None => return vec![Error::InvalidPath(self.main_path.clone())],
+        };
+
+        let session_name = format!("{} ({})", worktree_name, main_name);
+        let start_dir = self.worktree_path.display().to_string();
 
         let mut commands = TmuxCommands::new();
         commands.push(
             NewSession::new()
                 .session_name(&session_name)
                 .detached()
-                .start_directory(self.worktree_path.display().to_string()),
+                .start_directory(&start_dir),
         );
         for command in &self.settings.tmux.additional_windows {
-            let c = NewWindow::new()
-                .target_window(&session_name)
-                .start_directory(self.worktree_path.display().to_string())
-                .shell_command(format!("{}; exec $SHELL", &command));
-            commands.push(c);
+            commands.push(
+                NewWindow::new()
+                    .target_window(&session_name)
+                    .start_directory(&start_dir)
+                    .shell_command(format!("{}; exec $SHELL", command)),
+            );
         }
 
         match Tmux::with_commands(commands).status() {
-            Ok(status) => match status.code() {
-                Some(0) => info!("Tmux session spawned"),
-                _ => error!("Error spawning tmux: {}", status),
-            },
-            Err(e) => error!("Error tmux command {}", e),
+            Err(e) => vec![Error::TmuxError(e.to_string())],
+            Ok(status) if status.success() => {
+                info!("Tmux session spawned");
+                vec![]
+            }
+            Ok(status) => {
+                warn!("Tmux exited with {}", status);
+                vec![]
+            }
         }
     }
 }

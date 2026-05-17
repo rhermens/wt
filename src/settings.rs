@@ -35,13 +35,13 @@ impl Settings {
         self.commands = self
             .commands
             .iter()
-            .map(|command| Self::substitute_args(&command, &regex, substitutions))
+            .map(|command| Self::substitute_args(command, &regex, substitutions))
             .collect::<Result<Vec<String>, Error>>()?;
         self.tmux.additional_windows = self
             .tmux
             .additional_windows
             .iter()
-            .map(|command| Self::substitute_args(&command, &regex, substitutions))
+            .map(|command| Self::substitute_args(command, &regex, substitutions))
             .collect::<Result<Vec<String>, Error>>()?;
 
         Ok(self)
@@ -52,16 +52,23 @@ impl Settings {
         pattern: &Regex,
         args: &[String],
     ) -> Result<String, Error> {
-        let mut ret = template.to_string();
-        for (index, arg) in args.into_iter().enumerate() {
-            ret = ret.replace(&format!("${}", index + 1).to_string(), arg);
-        }
+        let mut missing = false;
+        let result = pattern.replace_all(template, |caps: &regex::Captures| {
+            let placeholder = &caps[0]; // e.g. "$1"
+            match placeholder[1..].parse::<usize>() {
+                Ok(n) if n >= 1 && n <= args.len() => args[n - 1].clone(),
+                _ => {
+                    missing = true;
+                    placeholder.to_string()
+                }
+            }
+        });
 
-        if pattern.is_match(&ret) {
+        if missing {
             return Err(Error::MissingSubstitutions);
         }
 
-        return Ok(ret);
+        Ok(result.into_owned())
     }
 
     pub fn new(path: &Path) -> Result<Settings, Error> {
