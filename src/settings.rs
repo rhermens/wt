@@ -81,8 +81,7 @@ impl Settings {
             .set_default("link", Vec::<String>::new())?
             .set_default("commands", Vec::<String>::new())?
             .set_default("tmux.create_session", false)?
-            .set_default("tmux.additional_windows", Vec::<String>::new())?
-            .add_source(File::with_name(&cwd.join(".wt").display().to_string()).required(false));
+            .set_default("tmux.additional_windows", Vec::<String>::new())?;
 
         if let Some(dirs) = ProjectDirs::from("", "", "wt")
             && !cfg!(debug_assertions)
@@ -92,6 +91,9 @@ impl Settings {
                     .required(false),
             );
         };
+
+        config = config
+            .add_source(File::with_name(&cwd.join(".wt").display().to_string()).required(false));
 
         if cfg!(debug_assertions) {
             info!("Adding config from {}", env!("CARGO_MANIFEST_DIR"));

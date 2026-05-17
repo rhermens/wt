@@ -27,8 +27,7 @@ impl WorktreeContext {
         let repo = Repository::discover(cwd).map_err(|e| Error::GitError { source: e })?;
 
         let main_path = repo
-            .path()
-            .parent()
+            .workdir()
             .ok_or_else(|| Error::InvalidPath(repo.path().to_path_buf()))?
             .to_path_buf();
 
