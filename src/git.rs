@@ -1,4 +1,8 @@
-use std::{fs, path::PathBuf, process::Command};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+    process::Command,
+};
 
 use git2::{ErrorCode, Repository, WorktreeAddOptions};
 use log::{error, info};
@@ -14,7 +18,7 @@ pub struct WorktreeContext {
 }
 
 impl WorktreeContext {
-    pub fn try_new(path: &PathBuf, substitutions: &[String]) -> Result<Self, Error> {
+    pub fn try_new(path: &Path, substitutions: &[String]) -> Result<Self, Error> {
         let repo = Repository::discover(std::env::current_dir().expect("Failed to get CWD"))
             .map_err(|e| Error::GitError { source: e })?;
 
@@ -33,7 +37,7 @@ impl WorktreeContext {
         })
     }
 
-    fn open_worktree(repo: &Repository, path: &PathBuf) -> Result<PathBuf, Error> {
+    fn open_worktree(repo: &Repository, path: &Path) -> Result<PathBuf, Error> {
         match repo.worktree(
             &path
                 .file_name()
@@ -48,7 +52,7 @@ impl WorktreeContext {
         ) {
             Ok(wt) => Ok(wt.path().to_path_buf()),
             Err(e) => match e.code() {
-                ErrorCode::Exists => Ok(path.clone()),
+                ErrorCode::Exists => Ok(path.to_path_buf()),
                 _ => {
                     return Err(Error::GitError { source: e });
                 }

@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use config::{Config, ConfigError, File};
 use directories::ProjectDirs;
@@ -64,11 +64,11 @@ impl Settings {
         return Ok(ret);
     }
 
-    pub fn new(path: &PathBuf) -> Result<Settings, Error> {
-        Self::load_settings(path).map_err(|e| Error::InvalidSettings { source: e })
+    pub fn new(path: &Path) -> Result<Settings, Error> {
+        Self::new_internal(path).map_err(|e| Error::InvalidSettings { source: e })
     }
 
-    fn load_settings(cwd: &PathBuf) -> Result<Settings, ConfigError> {
+    fn new_internal(cwd: &Path) -> Result<Settings, ConfigError> {
         let mut config = Config::builder()
             .set_default("copy", Vec::<String>::new())?
             .set_default("link", Vec::<String>::new())?

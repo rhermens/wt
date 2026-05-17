@@ -8,18 +8,6 @@ pub enum Error {
         source: git2::Error,
     },
 
-    #[error("Not a worktree")]
-    NotAWorktree,
-
-    #[error("Failed to open checkout: {source}")]
-    FailedToOpenRepository {
-        #[source]
-        source: git2::Error,
-    },
-
-    #[error("Failed to read working directories")]
-    InvalidWorkingDirectories,
-
     #[error("Settings error: {source}")]
     InvalidSettings {
         #[source]

@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, process::ExitCode};
 
 use clap::Parser;
 use log::error;
@@ -13,7 +13,7 @@ struct Args {
     pub command_substitutions: Vec<String>,
 }
 
-fn main() {
+fn main() -> ExitCode {
     settings::init_log();
     let args = Args::parse();
 
@@ -21,7 +21,7 @@ fn main() {
         Ok(wt) => wt,
         Err(e) => {
             error!("Failed to open worktree: {}", e);
-            return;
+            return ExitCode::FAILURE;
         }
     };
 
@@ -29,4 +29,6 @@ fn main() {
     worktree.link_sources();
     worktree.spawn_commands();
     worktree.spawn_tmux_session();
+
+    ExitCode::SUCCESS
 }
