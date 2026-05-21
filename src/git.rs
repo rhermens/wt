@@ -41,6 +41,24 @@ impl WorktreeContext {
         })
     }
 
+    fn ensure_parent_directory(target_path: &Path) -> Result<(), Error> {
+        let parent = target_path
+            .parent()
+            .ok_or_else(|| Error::InvalidPath(target_path.to_path_buf()))?;
+
+        if std::fs::exists(parent).map_err(|e| Error::IoError {
+            path: parent.to_path_buf(),
+            source: e,
+        })? {
+            return Ok(());
+        }
+
+        std::fs::create_dir_all(parent).map_err(|e| Error::IoError {
+            path: parent.to_path_buf(),
+            source: e,
+        })
+    }
+
     fn open_worktree(repo: &Repository, path: &Path) -> Result<PathBuf, Error> {
         let name = path
             .file_name()
@@ -53,6 +71,7 @@ impl WorktreeContext {
             source: e,
         })?;
 
+        Self::ensure_parent_directory(&path)?;
         match repo.worktree(
             &name,
             path,

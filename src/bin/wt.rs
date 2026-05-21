@@ -20,7 +20,7 @@ fn main() -> ExitCode {
     let worktree = match WorktreeContext::try_new(&args.path, &args.command_substitutions) {
         Ok(wt) => wt,
         Err(e) => {
-            error!("Failed to open worktree: {}", e);
+            error!("Failed to open worktree: {:?}", e);
             return ExitCode::FAILURE;
         }
     };
