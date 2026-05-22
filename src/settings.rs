@@ -1,7 +1,6 @@
 use std::path::{Path, PathBuf};
 
 use config::{Config, ConfigError, File};
-use directories::ProjectDirs;
 use log::info;
 use regex::Regex;
 use serde::Deserialize;
@@ -83,11 +82,11 @@ impl Settings {
             .set_default("tmux.create_session", false)?
             .set_default("tmux.additional_windows", Vec::<String>::new())?;
 
-        if let Some(dirs) = ProjectDirs::from("", "", "wt")
+        if let Some(home) = std::env::home_dir()
             && !cfg!(debug_assertions)
         {
             config = config.add_source(
-                File::with_name(&dirs.config_dir().join("config").display().to_string())
+                File::with_name(&home.join(".config/wt/config").display().to_string())
                     .required(false),
             );
         };
