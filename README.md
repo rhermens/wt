@@ -8,8 +8,8 @@ The `wt` binary creates a new Git worktree at a given path (or opens it if it al
 
 **Actions:**
 
-- **copy** — Copy files from the main working tree into the worktree (e.g. `.env` secrets that shouldn't be committed)
-- **link** — Create symlinks from the worktree pointing to files/directories in the main tree (e.g. `node_modules` to avoid redundant installs)
+- **copy** — Copy files from the main working tree into the worktree. Supports explicit paths or glob patterns
+- **link** — Create symlinks from the worktree pointing to files/directories in the main tree. Supports explicit paths or glob patterns
 - **commands** — Run arbitrary shell commands after checkout (e.g. build steps, environment setup)
 - **tmux** — Optionally create a named tmux session with additional windows for the new worktree
 
@@ -53,7 +53,9 @@ The following globals and functions are available in your configuration script:
 #### Functions
 
 - `wt.copy({ src = "<path>" })` — Copy a file or directory from the main tree into the worktree.
+- `wt.copy({ glob = "<pattern>", glob_ignore = "<pattern>" })` — Copy files matching a glob pattern. `glob_ignore` is optional and excludes matching paths.
 - `wt.link({ src = "<path>" })` — Create a symlink in the worktree pointing to a file or directory in the main tree.
+- `wt.link({ glob = "<pattern>", glob_ignore = "<pattern>" })` — Create symlinks for files matching a glob pattern. `glob_ignore` is optional and excludes matching paths.
 - `wt.command("<shell_command>")` — Run a shell command inside the worktree directory.
 - `wt.tmux.session(true | false)` — Enable or disable creating a tmux session for the worktree.
 - `wt.tmux.window("<command>")` — Add an additional tmux window. An empty string `""` creates a blank shell window. Each window runs the given command and then falls back to `$SHELL`.
@@ -63,6 +65,9 @@ The following globals and functions are available in your configuration script:
 ```lua
 -- Copy .env from the main tree so secrets are available in the worktree
 wt.copy({ src = ".env" })
+
+-- Copy all .env* files recursively, except inside .worktrees/
+wt.copy({ glob = "**/.env*", glob_ignore = ".worktrees/**" })
 
 -- Symlink node_modules to avoid reinstalling dependencies
 wt.link({ src = "node_modules" })
