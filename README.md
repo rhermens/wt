@@ -16,10 +16,12 @@ The `wt` binary creates a new Git worktree at a given path (or opens it if it al
 ## Usage
 
 ```sh
-wt <path> -- <command_substitions>
+wt <path> [-- <args>...]
 ```
 
 Creates (or opens) a worktree at `<path>`, then runs the configured copy, link, command, and tmux actions.
+
+Any arguments after `--` are passed through to the Lua configuration script and are accessible via `wt.args` (0-indexed).
 
 ## Installation
 
@@ -31,36 +33,49 @@ cargo install --path .
 
 ## Configuration
 
-Settings are loaded from the following locations (in order, last wins):
+Settings are written in **Lua** and loaded from the following locations (in order, last wins):
 
 | Location | Description |
 |---|---|
-| `$XDG_CONFIG_HOME/wt/config.yaml` | User-level defaults applied to all repositories |
-| `$GIT_DIR/.wt.yaml` | Per-repository configuration |
+| `~/.config/wt/config.lua` | User-level defaults applied to all repositories |
+| `<repo>/.wt.lua` | Per-repository configuration |
 
-### Config format
+### Lua API
 
-```yaml
-# Files to copy from the main worktree into each new worktree
-copy:
-  - .env
+The following globals and functions are available in your configuration script:
 
-# Files/directories to symlink from the main worktree into each new worktree
-link:
-  - node_modules
+#### Variables
 
-# Shell commands to run after checkout
-commands:
-  - npm run build
+- `wt.args` — Table of CLI arguments passed after `--` (0-indexed). E.g. `wt.args[0]`, `wt.args[1]`, etc.
+- `wt.main_path` — Absolute path to the main repository working tree.
+- `wt.worktree_path` — Absolute path to the new/existing worktree.
 
-# Tmux session options
-tmux:
-  create_session: true
-  additional_windows:
-    - ""        # blank shell window
-    - "nvim"    # open neovim
-    - ""
-    - "opencode --prompt=$1" # Each placeholder is replaced with <command_substitions>
+#### Functions
+
+- `wt.copy({ src = "<path>" })` — Copy a file or directory from the main tree into the worktree.
+- `wt.link({ src = "<path>" })` — Create a symlink in the worktree pointing to a file or directory in the main tree.
+- `wt.command("<shell_command>")` — Run a shell command inside the worktree directory.
+- `wt.tmux.session(true | false)` — Enable or disable creating a tmux session for the worktree.
+- `wt.tmux.window("<command>")` — Add an additional tmux window. An empty string `""` creates a blank shell window. Each window runs the given command and then falls back to `$SHELL`.
+
+### Example config
+
+```lua
+-- Copy .env from the main tree so secrets are available in the worktree
+wt.copy({ src = ".env" })
+
+-- Symlink node_modules to avoid reinstalling dependencies
+wt.link({ src = "node_modules" })
+
+-- Run setup commands after checkout
+wt.command("npm run build")
+
+-- Create a tmux session with extra windows
+wt.tmux.session(true)
+wt.tmux.window("")           -- blank shell window
+wt.tmux.window("nvim")       -- open neovim
+wt.tmux.window("")
+wt.tmux.window("opencode --prompt=" .. wt.args[0])
 ```
 
-See [`examples/config.yaml`](examples/config.yaml) for a reference configuration.
+See [`examples/config.lua`](examples/config.lua) for a reference configuration.
