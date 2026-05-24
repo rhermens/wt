@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
+use glob::Pattern;
 use log::info;
 use mlua::{Lua, LuaSerdeExt};
 use serde::Deserialize;
@@ -17,7 +18,9 @@ pub struct Settings {
 
 #[derive(Debug, Default, Deserialize)]
 pub struct IoOperation {
-    pub src: PathBuf,
+    pub src: Option<PathBuf>,
+    pub glob: Option<String>,
+    pub glob_ignore: Option<String>,
 }
 
 #[derive(Debug, Default)]
@@ -30,6 +33,52 @@ pub fn init_log() {
     env_logger::Builder::from_default_env()
         .filter(None, log::LevelFilter::Info)
         .init();
+}
+
+impl IoOperation {
+    fn src_into_pathbufs(&self) -> impl Iterator<Item = PathBuf> {
+        self.src
+            .as_ref()
+            .map(|src| match src.is_absolute() {
+                true => panic!("Src cannot be absolute"),
+                false => src.into(),
+            })
+            .into_iter()
+    }
+
+    fn glob_into_pathbufs(&self, relative_to: &Path) -> impl Iterator<Item = PathBuf> {
+        self.glob.as_ref().into_iter().flat_map(move |g| {
+            let ignore_pattern = self
+                .glob_ignore
+                .as_ref()
+                .map(|g| Pattern::new(&relative_to.join(g).display().to_string()).unwrap());
+
+            glob::glob(&relative_to.join(g).display().to_string())
+                .expect("Glob error")
+                .filter_map(|g| g.ok())
+                .filter(move |path| {
+                    !ignore_pattern.iter().any(|p| {
+                        let matched = p.matches_path(path);
+                        if matched {
+                            info!("Ignored path {}: pattern {}", path.display(), p,);
+                        }
+
+                        matched
+                    })
+                })
+                .map(move |path| {
+                    path.strip_prefix(relative_to)
+                        .expect("Invalid glob path")
+                        .into()
+                })
+        })
+    }
+
+    pub fn into_pathbufs(&self, relative_to: &Path) -> Vec<PathBuf> {
+        self.src_into_pathbufs()
+            .chain(self.glob_into_pathbufs(relative_to))
+            .collect()
+    }
 }
 
 impl Settings {

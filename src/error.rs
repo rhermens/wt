@@ -26,9 +26,13 @@ pub enum Error {
         source: std::io::Error,
     },
 
-    #[error("Copy error for '{path}': {source}")]
+    #[error("Invalid glob")]
+    GlobError,
+
+    #[error("Copy error for '{path} -> {dest}': {source}")]
     CopyError {
         path: PathBuf,
+        dest: PathBuf,
         #[source]
         source: std::io::Error,
     },

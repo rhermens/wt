@@ -113,15 +113,9 @@ impl WorktreeContext {
         self.settings
             .copy
             .iter()
-            .filter_map(|op| {
-                let src = match op.src.is_absolute() {
-                    true => op.src.clone(),
-                    false => self.main_path.join(&op.src),
-                };
-
-                let dst = self
-                    .worktree_path
-                    .join(src.file_name().expect("invalid src"));
+            .flat_map(|op| op.into_pathbufs(&self.main_path))
+            .filter_map(|src| {
+                let dst = self.worktree_path.join(&src);
 
                 match std::fs::copy(&src, &dst) {
                     Ok(_) => {
@@ -130,6 +124,7 @@ impl WorktreeContext {
                     }
                     Err(e) => Some(Error::CopyError {
                         path: src,
+                        dest: dst,
                         source: e,
                     }),
                 }
@@ -141,15 +136,9 @@ impl WorktreeContext {
         self.settings
             .link
             .iter()
-            .filter_map(|op| {
-                let src = match op.src.is_absolute() {
-                    true => op.src.clone(),
-                    false => self.main_path.join(&op.src),
-                };
-
-                let dst = self
-                    .worktree_path
-                    .join(src.file_name().expect("invalid src"));
+            .flat_map(|op| op.into_pathbufs(&self.main_path))
+            .filter_map(|src| {
+                let dst = self.worktree_path.join(&src);
 
                 match symlink_rs::symlink_auto(&src, &dst) {
                     Ok(_) => {

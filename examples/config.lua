@@ -1,8 +1,8 @@
 wt.copy({ src = ".env" })
+wt.copy({ glob = "**/.env*", glob_ignore = ".worktrees/**" })
 wt.link({ src = "node_modules" })
 
 wt.command("echo $GIT_DIR")
-wt.command("ls -lah")
 
 wt.tmux.session(true)
 wt.tmux.window("")
