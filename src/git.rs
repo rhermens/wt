@@ -80,7 +80,7 @@ impl WorktreeContext {
             .to_path_buf();
 
         let worktree_path = Self::open_worktree(&repo, path)?;
-        let settings = Settings::new(&main_path)?.substitute(substitutions)?;
+        let settings = Settings::new(&main_path, &worktree_path, substitutions)?;
 
         Ok(Self {
             main_path,
@@ -113,12 +113,19 @@ impl WorktreeContext {
         self.settings
             .copy
             .iter()
-            .filter_map(|file| {
-                let src = self.main_path.join(file);
-                let dst = self.worktree_path.join(file);
+            .filter_map(|op| {
+                let src = match op.src.is_absolute() {
+                    true => op.src.clone(),
+                    false => self.main_path.join(&op.src),
+                };
+
+                let dst = self
+                    .worktree_path
+                    .join(src.file_name().expect("invalid src"));
+
                 match std::fs::copy(&src, &dst) {
                     Ok(_) => {
-                        info!("Copied {}", file);
+                        info!("Copied {}", src.to_string_lossy());
                         None
                     }
                     Err(e) => Some(Error::CopyError {
@@ -134,12 +141,19 @@ impl WorktreeContext {
         self.settings
             .link
             .iter()
-            .filter_map(|file| {
-                let src = self.main_path.join(file);
-                let dst = self.worktree_path.join(file);
+            .filter_map(|op| {
+                let src = match op.src.is_absolute() {
+                    true => op.src.clone(),
+                    false => self.main_path.join(&op.src),
+                };
+
+                let dst = self
+                    .worktree_path
+                    .join(src.file_name().expect("invalid src"));
+
                 match symlink_rs::symlink_auto(&src, &dst) {
                     Ok(_) => {
-                        info!("Linked {}", file);
+                        info!("Linked {}", src.to_string_lossy());
                         None
                     }
                     Err(e) => Some(Error::LinkError {

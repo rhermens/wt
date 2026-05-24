@@ -10,15 +10,19 @@ struct Args {
     pub path: PathBuf,
 
     #[arg(index = 2, num_args = 1..)]
-    pub command_substitutions: Vec<String>,
+    pub args: Vec<String>,
 }
 
 fn main() -> ExitCode {
     settings::init_log();
     let args = Args::parse();
 
-    let worktree = match WorktreeContext::try_new(&args.path, &args.command_substitutions) {
+    let worktree = match WorktreeContext::try_new(&args.path, &args.args) {
         Ok(wt) => wt,
+        Err(wt::error::Error::LuaError { source }) => {
+            error!("{}", source);
+            return ExitCode::FAILURE;
+        }
         Err(e) => {
             error!("Failed to open worktree: {:?}", e);
             return ExitCode::FAILURE;

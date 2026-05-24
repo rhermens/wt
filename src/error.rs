@@ -10,10 +10,10 @@ pub enum Error {
         source: git2::Error,
     },
 
-    #[error("Settings error: {source}")]
-    InvalidSettings {
+    #[error("Lua error: {source}")]
+    LuaError {
         #[source]
-        source: config::ConfigError,
+        source: mlua::Error,
     },
 
     #[error("Missing substitution values")]

@@ -1,21 +1,26 @@
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
 
-use config::{Config, ConfigError, File};
 use log::info;
-use regex::Regex;
+use mlua::{Lua, LuaSerdeExt};
 use serde::Deserialize;
 
 use crate::error::Error;
 
-#[derive(Debug, Deserialize, Default)]
+#[derive(Debug, Default)]
 pub struct Settings {
-    pub copy: Vec<String>,
-    pub link: Vec<String>,
+    pub copy: Vec<IoOperation>,
+    pub link: Vec<IoOperation>,
     pub commands: Vec<String>,
     pub tmux: TmuxOptions,
 }
 
-#[derive(Debug, Deserialize, Default)]
+#[derive(Debug, Default, Deserialize)]
+pub struct IoOperation {
+    pub src: PathBuf,
+}
+
+#[derive(Debug, Default)]
 pub struct TmuxOptions {
     pub create_session: bool,
     pub additional_windows: Vec<String>,
@@ -28,86 +33,131 @@ pub fn init_log() {
 }
 
 impl Settings {
-    pub fn substitute(mut self, substitutions: &[String]) -> Result<Self, Error> {
-        let regex = Regex::new(r"\$\d+").unwrap();
+    pub fn new(main_path: &Path, worktree_path: &Path, args: &[String]) -> Result<Settings, Error> {
+        let settings = Arc::new(Mutex::new(Settings::default()));
 
-        self.commands = self
-            .commands
-            .iter()
-            .map(|command| Self::substitute_args(command, &regex, substitutions))
-            .collect::<Result<Vec<String>, Error>>()?;
-        self.tmux.additional_windows = self
-            .tmux
-            .additional_windows
-            .iter()
-            .map(|command| Self::substitute_args(command, &regex, substitutions))
-            .collect::<Result<Vec<String>, Error>>()?;
+        let lua = Lua::new();
+        Self::register_api(&lua, &settings, main_path, worktree_path, args)
+            .map_err(|e| Error::LuaError { source: e })?;
 
-        Ok(self)
+        for source in Self::config_sources(main_path)? {
+            let script = std::fs::read_to_string(&source).map_err(|e| Error::IoError {
+                path: source.clone(),
+                source: e,
+            })?;
+            lua.load(&script)
+                .set_name(source.display().to_string())
+                .exec()
+                .map_err(|e| Error::LuaError { source: e })?;
+        }
+
+        drop(lua);
+
+        let settings = Arc::try_unwrap(settings)
+            .expect("Reference error")
+            .into_inner()
+            .expect("Poison error");
+
+        Ok(settings)
     }
 
-    pub fn substitute_args(
-        template: &str,
-        pattern: &Regex,
-        args: &[String],
-    ) -> Result<String, Error> {
-        let mut missing = false;
-        let result = pattern.replace_all(template, |caps: &regex::Captures| {
-            let placeholder = &caps[0]; // e.g. "$1"
-            match placeholder[1..].parse::<usize>() {
-                Ok(n) if n >= 1 && n <= args.len() => args[n - 1].clone(),
-                _ => {
-                    missing = true;
-                    placeholder.to_string()
+    fn register_api(
+        lua: &Lua,
+        settings: &Arc<Mutex<Settings>>,
+        main_path: &Path,
+        worktree_path: &Path,
+        cli_args: &[String],
+    ) -> Result<(), mlua::Error> {
+        let globals = lua.globals();
+
+        let wt = lua.create_table()?;
+        wt.set(
+            "args",
+            lua.create_table_from(cli_args.iter().map(|s| s.as_str()).enumerate())?,
+        )?;
+
+        wt.set("main_path", main_path.to_string_lossy().as_ref())?;
+        wt.set("worktree_path", worktree_path.to_string_lossy().as_ref())?;
+
+        let s = Arc::clone(settings);
+        wt.set(
+            "copy",
+            lua.create_function(move |lua, op: mlua::Value| {
+                s.lock().unwrap().copy.push(lua.from_value(op)?);
+                Ok(())
+            })?,
+        )?;
+
+        let s = Arc::clone(settings);
+        wt.set(
+            "link",
+            lua.create_function(move |lua, op: mlua::Value| {
+                s.lock().unwrap().link.push(lua.from_value(op)?);
+                Ok(())
+            })?,
+        )?;
+
+        let s = Arc::clone(settings);
+        wt.set(
+            "command",
+            lua.create_function(move |_, cmd: String| {
+                s.lock().unwrap().commands.push(cmd);
+                Ok(())
+            })?,
+        )?;
+
+        let tmux = lua.create_table()?;
+
+        let s = Arc::clone(settings);
+        tmux.set(
+            "session",
+            lua.create_function(move |_, enabled: bool| {
+                s.lock().unwrap().tmux.create_session = enabled;
+                Ok(())
+            })?,
+        )?;
+
+        let s = Arc::clone(settings);
+        tmux.set(
+            "window",
+            lua.create_function(move |_, cmd: String| {
+                s.lock().unwrap().tmux.additional_windows.push(cmd);
+                Ok(())
+            })?,
+        )?;
+
+        wt.set("tmux", tmux)?;
+
+        globals.set("wt", wt)?;
+
+        Ok(())
+    }
+
+    fn config_sources(main_path: &Path) -> Result<Vec<PathBuf>, Error> {
+        let mut sources = Vec::new();
+
+        if !cfg!(debug_assertions) {
+            if let Some(home) = std::env::home_dir() {
+                let global = home.join(".config/wt/config.lua");
+                if global.exists() {
+                    sources.push(global);
                 }
             }
-        });
-
-        if missing {
-            return Err(Error::MissingSubstitutions);
         }
 
-        Ok(result.into_owned())
-    }
-
-    pub fn new(path: &Path) -> Result<Settings, Error> {
-        Self::new_internal(path).map_err(|e| Error::InvalidSettings { source: e })
-    }
-
-    fn new_internal(cwd: &Path) -> Result<Settings, ConfigError> {
-        let mut config = Config::builder()
-            .set_default("copy", Vec::<String>::new())?
-            .set_default("link", Vec::<String>::new())?
-            .set_default("commands", Vec::<String>::new())?
-            .set_default("tmux.create_session", false)?
-            .set_default("tmux.additional_windows", Vec::<String>::new())?;
-
-        if let Some(home) = std::env::home_dir()
-            && !cfg!(debug_assertions)
-        {
-            config = config.add_source(
-                File::with_name(&home.join(".config/wt/config").display().to_string())
-                    .required(false),
-            );
-        };
-
-        config = config
-            .add_source(File::with_name(&cwd.join(".wt").display().to_string()).required(false));
+        let local = main_path.join(".wt.lua");
+        if local.exists() {
+            sources.push(local);
+        }
 
         if cfg!(debug_assertions) {
-            info!("Adding config from {}", env!("CARGO_MANIFEST_DIR"));
-            config = config.add_source(
-                File::with_name(
-                    &PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                        .join("examples/config")
-                        .display()
-                        .to_string(),
-                )
-                .required(false),
-            );
+            let debug = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("examples/config.lua");
+            if debug.exists() {
+                info!("Adding config from {}", env!("CARGO_MANIFEST_DIR"));
+                sources.push(debug);
+            }
         }
 
-        let settings = config.build()?;
-        settings.try_deserialize()
+        Ok(sources)
     }
 }
