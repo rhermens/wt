@@ -47,11 +47,10 @@ The following globals and functions are available in your configuration script:
 #### Variables
 
 - `wt.args` — Table of CLI arguments passed after `--` (0-indexed). E.g. `wt.args[0]`, `wt.args[1]`, etc.
-- `wt.main_path` — Absolute path to the main repository working tree.
-- `wt.worktree_path` — Absolute path to the new/existing worktree.
 
 #### Functions
 
+- `wt.worktrees_directory("<path>")` — Set the directory where worktrees are created. Defaults to the repository root.
 - `wt.copy({ src = "<path>" })` — Copy a file or directory from the main tree into the worktree.
 - `wt.copy({ glob = "<pattern>", glob_ignore = "<pattern>" })` — Copy files matching a glob pattern. `glob_ignore` is optional and excludes matching paths.
 - `wt.link({ src = "<path>" })` — Create a symlink in the worktree pointing to a file or directory in the main tree.
@@ -63,6 +62,9 @@ The following globals and functions are available in your configuration script:
 ### Example config
 
 ```lua
+-- Store all worktrees under .worktrees/ inside the repo
+wt.worktrees_directory(".worktrees")
+
 -- Copy .env from the main tree so secrets are available in the worktree
 wt.copy({ src = ".env" })
 
@@ -72,15 +74,15 @@ wt.copy({ glob = "**/.env*", glob_ignore = ".worktrees/**" })
 -- Symlink node_modules to avoid reinstalling dependencies
 wt.link({ src = "node_modules" })
 
--- Run setup commands after checkout
-wt.command("npm run build")
+-- Run a command after checkout
+wt.command("echo $GIT_DIR")
 
 -- Create a tmux session with extra windows
 wt.tmux.session(true)
 wt.tmux.window("")           -- blank shell window
 wt.tmux.window("nvim")       -- open neovim
 wt.tmux.window("")
-wt.tmux.window("opencode --prompt=" .. wt.args[0])
+wt.tmux.window(wt.args[0] and string.format("claude \"%s\"", wt.args[0]) or "claude")
 ```
 
 See [`examples/config.lua`](examples/config.lua) for a reference configuration.
