@@ -66,7 +66,7 @@ impl WorktreeTargetPath {
 }
 
 impl WorktreeContext {
-    pub fn try_new(path: &Path, substitutions: &[String]) -> Result<Self, Error> {
+    pub fn try_new(path: &Path, args: &[String]) -> Result<Self, Error> {
         let cwd = std::env::current_dir().map_err(|e| Error::IoError {
             path: PathBuf::from("."),
             source: e,
@@ -80,7 +80,7 @@ impl WorktreeContext {
             .to_path_buf();
 
         let worktree_path = Self::open_worktree(&repo, path)?;
-        let settings = Settings::new(&main_path, &worktree_path, substitutions)?;
+        let settings = Settings::new(&main_path, &worktree_path, args)?;
 
         Ok(Self {
             main_path,
