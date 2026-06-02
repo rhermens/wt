@@ -1,3 +1,5 @@
+wt.worktrees_directory(".worktrees")
+
 wt.copy({ src = ".env" })
 wt.copy({ glob = "**/.env*", glob_ignore = ".worktrees/**" })
 wt.link({ src = "node_modules" })

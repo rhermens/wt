@@ -17,6 +17,7 @@ pub struct WorktreeContext {
     settings: Settings,
 }
 
+#[derive(Debug)]
 struct WorktreeTargetPath {
     path: PathBuf,
     basename: String,
@@ -79,8 +80,17 @@ impl WorktreeContext {
             .ok_or_else(|| Error::InvalidPath(repo.path().to_path_buf()))?
             .to_path_buf();
 
-        let worktree_path = Self::open_worktree(&repo, path)?;
-        let settings = Settings::new(&main_path, &worktree_path, args)?;
+        let settings = Settings::new(&main_path, args)?;
+        let target_path = WorktreeTargetPath::try_new(
+            &settings
+                .worktrees_directory
+                .as_deref()
+                .or_else(|| repo.workdir())
+                .expect("failed to read path")
+                .join(path),
+        )?;
+        target_path.ensure()?;
+        let worktree_path = Self::open_worktree(&repo, &target_path)?;
 
         Ok(Self {
             main_path,
@@ -89,20 +99,24 @@ impl WorktreeContext {
         })
     }
 
-    fn open_worktree(repo: &Repository, path: &Path) -> Result<PathBuf, Error> {
-        let worktree_path = WorktreeTargetPath::try_new(path)?;
-        worktree_path.ensure()?;
-
+    fn open_worktree(
+        repo: &Repository,
+        worktree_path: &WorktreeTargetPath,
+    ) -> Result<PathBuf, Error> {
         match repo.worktree(
             &worktree_path.basename,
             &worktree_path.path,
             Some(WorktreeAddOptions::new().checkout_existing(!worktree_path.is_existing)),
         ) {
             Ok(wt) => Ok(wt.path().to_path_buf()),
-            Err(e) => match e.code() {
-                ErrorCode::Exists => {
+            Err(e) => match (e.code(), e.raw_class()) {
+                (ErrorCode::Exists, _) => {
                     warn!("Worktree exists: {}", e);
-                    Ok(path.to_path_buf())
+                    Ok(worktree_path.path.to_path_buf())
+                }
+                (ErrorCode::GenericError, 32) => {
+                    warn!("Worktree exists: {}", e);
+                    Ok(worktree_path.path.to_path_buf())
                 }
                 _ => Err(Error::GitError { source: e }),
             },

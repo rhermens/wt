@@ -14,6 +14,7 @@ pub struct Settings {
     pub link: Vec<IoOperation>,
     pub commands: Vec<String>,
     pub tmux: TmuxOptions,
+    pub worktrees_directory: Option<PathBuf>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -82,12 +83,11 @@ impl IoOperation {
 }
 
 impl Settings {
-    pub fn new(main_path: &Path, worktree_path: &Path, args: &[String]) -> Result<Settings, Error> {
+    pub fn new(main_path: &Path, args: &[String]) -> Result<Settings, Error> {
         let settings = Arc::new(Mutex::new(Settings::default()));
 
         let lua = Lua::new();
-        Self::register_api(&lua, &settings, main_path, worktree_path, args)
-            .map_err(|e| Error::LuaError { source: e })?;
+        Self::register_api(&lua, &settings, args).map_err(|e| Error::LuaError { source: e })?;
 
         for source in Self::config_sources(main_path)? {
             let script = std::fs::read_to_string(&source).map_err(|e| Error::IoError {
@@ -113,8 +113,6 @@ impl Settings {
     fn register_api(
         lua: &Lua,
         settings: &Arc<Mutex<Settings>>,
-        main_path: &Path,
-        worktree_path: &Path,
         cli_args: &[String],
     ) -> Result<(), mlua::Error> {
         let globals = lua.globals();
@@ -125,8 +123,14 @@ impl Settings {
             lua.create_table_from(cli_args.iter().map(|s| s.as_str()).enumerate())?,
         )?;
 
-        wt.set("main_path", main_path.to_string_lossy().as_ref())?;
-        wt.set("worktree_path", worktree_path.to_string_lossy().as_ref())?;
+        let s = Arc::clone(settings);
+        wt.set(
+            "worktrees_directory",
+            lua.create_function(move |lua, op: mlua::Value| {
+                s.lock().unwrap().worktrees_directory = Some(lua.from_value(op)?);
+                Ok(())
+            })?,
+        )?;
 
         let s = Arc::clone(settings);
         wt.set(
