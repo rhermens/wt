@@ -126,8 +126,10 @@ impl Settings {
         let s = Arc::clone(settings);
         wt.set(
             "worktrees_directory",
-            lua.create_function(move |lua, op: mlua::Value| {
-                s.lock().unwrap().worktrees_directory = Some(lua.from_value(op)?);
+            lua.create_function(move |_, op: mlua::Value| {
+                s.lock().unwrap().worktrees_directory = shellexpand::full(&op.to_string()?)
+                    .ok()
+                    .map(|s| PathBuf::from(s.into_owned()));
                 Ok(())
             })?,
         )?;

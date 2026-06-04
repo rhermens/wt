@@ -1,4 +1,4 @@
-wt.worktrees_directory(".worktrees")
+wt.worktrees_directory("~/.worktrees")
 
 wt.copy({ src = ".env" })
 wt.copy({ glob = "**/.env*", glob_ignore = ".worktrees/**" })
