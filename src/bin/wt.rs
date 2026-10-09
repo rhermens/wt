@@ -6,6 +6,9 @@ use wt::{git::WorktreeContext, settings};
 
 #[derive(Parser, Debug)]
 struct Args {
+    #[arg(long)]
+    pub cwd: Option<PathBuf>,
+
     #[arg(index = 1, required = true)]
     pub path: PathBuf,
 
@@ -17,7 +20,11 @@ fn main() -> ExitCode {
     settings::init_log();
     let args = Args::parse();
 
-    let worktree = match WorktreeContext::try_new(&args.path, &args.args) {
+    let cwd = args
+        .cwd
+        .or_else(|| std::env::current_dir().ok())
+        .expect("Unable to read cwd");
+    let worktree = match WorktreeContext::try_new(&cwd, &args.path, &args.args) {
         Ok(wt) => wt,
         Err(wt::error::Error::LuaError { source }) => {
             error!("{}", source);

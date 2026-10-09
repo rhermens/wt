@@ -67,12 +67,7 @@ impl WorktreeTargetPath {
 }
 
 impl WorktreeContext {
-    pub fn try_new(path: &Path, args: &[String]) -> Result<Self, Error> {
-        let cwd = std::env::current_dir().map_err(|e| Error::IoError {
-            path: PathBuf::from("."),
-            source: e,
-        })?;
-
+    pub fn try_new(cwd: &Path, path: &Path, args: &[String]) -> Result<Self, Error> {
         let repo = Repository::discover(cwd).map_err(|e| Error::GitError { source: e })?;
 
         let main_path = repo
