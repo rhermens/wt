@@ -204,7 +204,10 @@ impl WorktreeContext {
             None => return vec![Error::InvalidPath(self.main_path.clone())],
         };
 
-        let session_name = format!("{} ({})", worktree_name, main_name);
+        // tmux parses `.` and `:` in targets as window/pane separators.
+        let session_name =
+            format!("{} ({})", worktree_name, main_name).replace(['.', ':'], "_");
+        let session_target = format!("={}:", session_name);
         let start_dir = self.worktree_path.display().to_string();
 
         let mut commands = TmuxCommands::new();
@@ -217,7 +220,7 @@ impl WorktreeContext {
         for command in &self.settings.tmux.additional_windows {
             commands.push(
                 NewWindow::new()
-                    .target_window(&session_name)
+                    .target_window(&session_target)
                     .start_directory(&start_dir)
                     .shell_command(format!("{}; exec $SHELL", command)),
             );
