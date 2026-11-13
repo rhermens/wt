@@ -24,6 +24,11 @@
 
         wt = craneLib.buildPackage (commonArgs // {
           inherit cargoArtifacts;
+          nativeBuildInputs = commonArgs.nativeBuildInputs ++ [ pkgs.installShellFiles ];
+          postInstall = ''
+            manPage=$(find "''${CARGO_TARGET_DIR:-target}" -path '*/build/wt-*/out/wt.1' -print -quit)
+            installManPage "$manPage"
+          '';
         });
       in
       {

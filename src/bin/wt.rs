@@ -1,20 +1,8 @@
-use std::{path::PathBuf, process::ExitCode};
+use std::process::ExitCode;
 
 use clap::Parser;
 use log::error;
-use wt::{git::WorktreeContext, settings};
-
-#[derive(Parser, Debug)]
-struct Args {
-    #[arg(long)]
-    pub cwd: Option<PathBuf>,
-
-    #[arg(index = 1, required = true)]
-    pub path: PathBuf,
-
-    #[arg(index = 2, num_args = 1..)]
-    pub args: Vec<String>,
-}
+use wt::{cli::Args, git::WorktreeContext, settings};
 
 fn main() -> ExitCode {
     settings::init_log();

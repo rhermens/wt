@@ -191,12 +191,12 @@ impl Settings {
     fn config_sources(main_path: &Path) -> Result<Vec<PathBuf>, Error> {
         let mut sources = Vec::new();
 
-        if !cfg!(debug_assertions) {
-            if let Some(home) = std::env::home_dir() {
-                let global = home.join(".config/wt/config.lua");
-                if global.exists() {
-                    sources.push(global);
-                }
+        if !cfg!(debug_assertions)
+            && let Some(home) = std::env::home_dir()
+        {
+            let global = home.join(".config/wt/config.lua");
+            if global.exists() {
+                sources.push(global);
             }
         }
 

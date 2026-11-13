@@ -16,10 +16,12 @@ The `wt` binary creates a new Git worktree at a given path (or opens it if it al
 ## Usage
 
 ```sh
-wt <path> [-- <args>...]
+wt [--cwd <directory>] <path> [-- <args>...]
 ```
 
 Creates (or opens) a worktree at `<path>`, then runs the configured copy, link, command, and tmux actions.
+
+Use `--cwd <directory>` to discover the Git repository from a different directory instead of the current directory.
 
 Any arguments after `--` are passed through to the Lua configuration script and are accessible via `wt.args` (0-indexed).
 
@@ -30,6 +32,10 @@ Build and install the binary:
 ```sh
 cargo install --path .
 ```
+
+Each build generates a `wt.1` man page from the CLI definitions using `clap_mangen`.
+The page is written to Cargo's `OUT_DIR`, typically `target/<profile>/build/wt-<hash>/out/wt.1`.
+Preview it with `man -l <path-to-wt.1>` or install it in your system's `man1` directory.
 
 ## Configuration
 
