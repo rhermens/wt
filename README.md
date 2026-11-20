@@ -63,7 +63,8 @@ The following globals and functions are available in your configuration script:
 - `wt.link({ glob = "<pattern>", glob_ignore = "<pattern>" })` — Create symlinks for files matching a glob pattern. `glob_ignore` is optional and excludes matching paths.
 - `wt.command("<shell_command>")` — Run a shell command inside the worktree directory.
 - `wt.tmux.session(true | false)` — Enable or disable creating a tmux session for the worktree.
-- `wt.tmux.window("<command>")` — Add an additional tmux window. An empty string `""` creates a blank shell window. Each window runs the given command and then falls back to `$SHELL`.
+- `wt.tmux.window("<command>")` — Add an additional tmux window. An empty string `""`, `nil`, or no argument creates a blank shell window. Each command falls back to `$SHELL` when it exits.
+- `wt.tmux.window({ "<command>", "<command>" })` — Create one window with vertically stacked panes, one per command. An empty table creates no window.
 
 ### Example config
 
@@ -87,7 +88,7 @@ wt.command("echo $GIT_DIR")
 wt.tmux.session(true)
 wt.tmux.window("")           -- blank shell window
 wt.tmux.window("nvim")       -- open neovim
-wt.tmux.window("")
+wt.tmux.window({ "", "" })   -- two stacked shell panes
 wt.tmux.window(wt.args[0] and string.format("claude \"%s\"", wt.args[0]) or "claude")
 ```
 
