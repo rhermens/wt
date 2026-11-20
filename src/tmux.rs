@@ -2,9 +2,7 @@ use std::sync::{Arc, Mutex};
 
 use log::{info, warn};
 use mlua::{Lua, LuaSerdeExt, Table};
-use tmux_interface::{
-    MoveWindow, NewSession, NewWindow, SetOption, SplitWindow, Tmux, TmuxCommands,
-};
+use tmux_interface::{NewSession, NewWindow, SplitWindow, Tmux, TmuxCommands};
 
 use crate::{error::Error, git::WorktreeContext};
 
