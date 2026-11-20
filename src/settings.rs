@@ -7,6 +7,7 @@ use mlua::{Lua, LuaSerdeExt};
 use serde::Deserialize;
 
 use crate::error::Error;
+use crate::tmux::TmuxOptions;
 
 #[derive(Debug, Default)]
 pub struct Settings {
@@ -17,17 +18,15 @@ pub struct Settings {
     pub worktrees_directory: Option<PathBuf>,
 }
 
+pub trait Register {
+    fn add<T>(settings: &Settings);
+}
+
 #[derive(Debug, Default, Deserialize)]
 pub struct IoOperation {
     pub src: Option<PathBuf>,
     pub glob: Option<String>,
     pub glob_ignore: Option<String>,
-}
-
-#[derive(Debug, Default)]
-pub struct TmuxOptions {
-    pub create_session: bool,
-    pub additional_windows: Vec<String>,
 }
 
 pub fn init_log() {
@@ -161,27 +160,7 @@ impl Settings {
             })?,
         )?;
 
-        let tmux = lua.create_table()?;
-
-        let s = Arc::clone(settings);
-        tmux.set(
-            "session",
-            lua.create_function(move |_, enabled: bool| {
-                s.lock().unwrap().tmux.create_session = enabled;
-                Ok(())
-            })?,
-        )?;
-
-        let s = Arc::clone(settings);
-        tmux.set(
-            "window",
-            lua.create_function(move |_, cmd: String| {
-                s.lock().unwrap().tmux.additional_windows.push(cmd);
-                Ok(())
-            })?,
-        )?;
-
-        wt.set("tmux", tmux)?;
+        wt.set("tmux", TmuxOptions::create_lua_table(lua, settings)?)?;
 
         globals.set("wt", wt)?;
 

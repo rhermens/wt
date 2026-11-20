@@ -2,7 +2,7 @@ use std::process::ExitCode;
 
 use clap::Parser;
 use log::error;
-use wt::{cli::Args, git::WorktreeContext, settings};
+use wt::{cli::Args, git::WorktreeContext, settings, tmux::SpawnsSessions};
 
 fn main() -> ExitCode {
     settings::init_log();
