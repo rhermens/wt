@@ -2,7 +2,9 @@ use std::sync::{Arc, Mutex};
 
 use log::{info, warn};
 use mlua::{Lua, LuaSerdeExt, Table};
-use tmux_interface::{NewSession, NewWindow, SplitWindow, Tmux, TmuxCommands};
+use tmux_interface::{
+    MoveWindow, NewSession, NewWindow, SetOption, SplitWindow, Tmux, TmuxCommands,
+};
 
 use crate::{error::Error, git::WorktreeContext};
 
@@ -70,38 +72,49 @@ impl SpawnsSessions for WorktreeContext {
         let session_target = format!("={}:", session_name);
         let start_dir = self.worktree_path.display().to_string();
 
+        let shell_command = |command: &str| {
+            if command.is_empty() {
+                "exec $SHELL".to_owned()
+            } else {
+                format!("{}; exec $SHELL", command)
+            }
+        };
+        let mut windows = self
+            .settings
+            .tmux
+            .additional_windows
+            .iter()
+            .filter_map(|commands| commands.split_first());
+        let first_window = windows.next();
+        let mut new_session = NewSession::new()
+            .session_name(&session_name)
+            .detached()
+            .start_directory(&start_dir);
+        if let Some((command, _)) = first_window {
+            new_session = new_session.shell_command(shell_command(command));
+        }
+
         let mut commands = TmuxCommands::new();
-        commands.push(
-            NewSession::new()
-                .session_name(&session_name)
-                .detached()
-                .start_directory(&start_dir),
-        );
+        commands.push(new_session);
 
-        for window_commands in &self.settings.tmux.additional_windows {
-            for (index, command) in window_commands.iter().enumerate() {
-                let shell_command = if command.is_empty() {
-                    "exec $SHELL".to_owned()
-                } else {
-                    format!("{}; exec $SHELL", command)
-                };
-
-                if index == 0 {
-                    commands.push(
-                        NewWindow::new()
-                            .target_window(&session_target)
-                            .start_directory(&start_dir)
-                            .shell_command(shell_command),
-                    );
-                } else {
-                    commands.push(
-                        SplitWindow::new()
-                            .vertical()
-                            .target_pane(&session_target)
-                            .start_directory(&start_dir)
-                            .shell_command(shell_command),
-                    );
-                }
+        for (index, (command, pane_commands)) in first_window.into_iter().chain(windows).enumerate()
+        {
+            if index > 0 {
+                commands.push(
+                    NewWindow::new()
+                        .target_window(&session_target)
+                        .start_directory(&start_dir)
+                        .shell_command(shell_command(command)),
+                );
+            }
+            for command in pane_commands {
+                commands.push(
+                    SplitWindow::new()
+                        .vertical()
+                        .target_pane(&session_target)
+                        .start_directory(&start_dir)
+                        .shell_command(shell_command(command)),
+                );
             }
         }
 
