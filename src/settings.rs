@@ -82,11 +82,12 @@ impl IoOperation {
 }
 
 impl Settings {
-    pub fn new(main_path: &Path, args: &[String]) -> Result<Settings, Error> {
+    pub fn new(main_path: &Path, target: &Path, args: &[String]) -> Result<Settings, Error> {
         let settings = Arc::new(Mutex::new(Settings::default()));
 
         let lua = Lua::new();
-        Self::register_api(&lua, &settings, args).map_err(|e| Error::LuaError { source: e })?;
+        Self::register_api(&target.to_string_lossy(), &lua, &settings, args)
+            .map_err(|e| Error::LuaError { source: e })?;
 
         for source in Self::config_sources(main_path)? {
             let script = std::fs::read_to_string(&source).map_err(|e| Error::IoError {
@@ -110,6 +111,7 @@ impl Settings {
     }
 
     fn register_api(
+        target: &str,
         lua: &Lua,
         settings: &Arc<Mutex<Settings>>,
         cli_args: &[String],
@@ -121,6 +123,7 @@ impl Settings {
             "args",
             lua.create_table_from(cli_args.iter().map(|s| s.as_str()).enumerate())?,
         )?;
+        wt.set("worktree", lua.create_string(&target)?)?;
 
         let s = Arc::clone(settings);
         wt.set(

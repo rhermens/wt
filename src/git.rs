@@ -74,7 +74,7 @@ impl WorktreeContext {
             .ok_or_else(|| Error::InvalidPath(repo.path().to_path_buf()))?
             .to_path_buf();
 
-        let settings = Settings::new(&main_path, args)?;
+        let settings = Settings::new(&main_path, &path, args)?;
         let target_path = WorktreeTargetPath::try_new(
             &settings
                 .worktrees_directory
